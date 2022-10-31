@@ -1,6 +1,7 @@
 ### custom ignores
 search-EXP-*/
 *.0
+.vscode
 
 ### git default python ignore list
 # Byte-compiled / optimized / DLL files

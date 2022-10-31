@@ -110,8 +110,7 @@ def main():
   architect = Architect(model, args)
 
   for epoch in range(args.epochs):
-    scheduler.step()
-    lr = scheduler.get_lr()[0]
+    lr = scheduler.get_last_lr()[0]
     logging.info('epoch %d lr %e', epoch, lr)
 
     genotype = model.genotype()
@@ -122,6 +121,7 @@ def main():
 
     # training
     train_acc, train_obj = train(train_queue, valid_queue, model, architect, criterion, optimizer, lr,epoch)
+    scheduler.step()
     logging.info('train_acc %f', train_acc)
 
     # validation
@@ -184,8 +184,8 @@ def infer(valid_queue, model, criterion):
   for step, (input, target) in enumerate(valid_queue):
     #input = input.cuda()
     #target = target.cuda(non_blocking=True)
-    input = Variable(input, volatile=True).cuda()
-    target = Variable(target, volatile=True).cuda(non_blocking=True)
+    input = Variable(input).cuda().no_grad()
+    target = Variable(target).cuda(non_blocking=True).no_grad()
     logits = model(input)
     loss = criterion(logits, target)
 
