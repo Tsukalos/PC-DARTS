@@ -1,5 +1,6 @@
 ### custom ignores
 search-EXP-*/
+eval-EXP-*/
 *.0
 .vscode
 

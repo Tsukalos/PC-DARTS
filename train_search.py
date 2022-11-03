@@ -161,7 +161,7 @@ def train(train_queue, valid_queue, model, architect, criterion, optimizer, lr,e
     loss = criterion(logits, target)
 
     loss.backward()
-    nn.utils.clip_grad_norm(model.parameters(), args.grad_clip)
+    nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
     optimizer.step()
 
     prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
@@ -184,8 +184,8 @@ def infer(valid_queue, model, criterion):
   for step, (input, target) in enumerate(valid_queue):
     #input = input.cuda()
     #target = target.cuda(non_blocking=True)
-    input = Variable(input).cuda().no_grad()
-    target = Variable(target).cuda(non_blocking=True).no_grad()
+    input = Variable(input).cuda()
+    target = Variable(target).cuda(non_blocking=True)
     logits = model(input)
     loss = criterion(logits, target)
 
