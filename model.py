@@ -3,13 +3,14 @@ import torch.nn as nn
 from operations import *
 from torch.autograd import Variable
 from utils import drop_path
+from torchvision.models import resnet18
 
 
 class Cell(nn.Module):
 
   def __init__(self, genotype, C_prev_prev, C_prev, C, reduction, reduction_prev):
     super(Cell, self).__init__()
-    print(C_prev_prev, C_prev, C)
+    # print(C_prev_prev, C_prev, C)
 
     if reduction_prev:
       self.preprocess0 = FactorizedReduce(C_prev_prev, C)
@@ -71,7 +72,7 @@ class AuxiliaryHeadCIFAR(nn.Module):
       nn.Conv2d(C, 128, 1, bias=False),
       nn.BatchNorm2d(128),
       nn.ReLU(inplace=True),
-      nn.Conv2d(128, 768, 2, bias=False),
+      nn.Conv2d(128, 768, 1, bias=False),
       nn.BatchNorm2d(768),
       nn.ReLU(inplace=True)
     )
@@ -91,10 +92,10 @@ class AuxiliaryHeadImageNet(nn.Module):
     self.features = nn.Sequential(
       nn.ReLU(inplace=True),
       nn.AvgPool2d(5, stride=2, padding=0, count_include_pad=False),
-      nn.Conv2d(C, 128, 1, bias=False),
+      nn.Conv2d(C, 128, 1, bias=True),
       nn.BatchNorm2d(128),
       nn.ReLU(inplace=True),
-      nn.Conv2d(128, 768, 2, bias=False),
+      nn.Conv2d(128, 768, 2, bias=True),
       # NOTE: This batchnorm was omitted in my earlier implementation due to a typo.
       # Commenting it out for consistency with the experiments in the paper.
       # nn.BatchNorm2d(768),
@@ -107,6 +108,56 @@ class AuxiliaryHeadImageNet(nn.Module):
     x = self.classifier(x.view(x.size(0),-1))
     return x
 
+
+
+class NetworkVideo(nn.Module):
+
+  def __init__(self, C, num_classes, layers, auxiliary, genotype, dct_channels=64):
+    super(NetworkVideo, self).__init__()
+    self._layers = layers
+    self._auxiliary = auxiliary
+    self.dct_channels = dct_channels
+
+    stem_multiplier = 3
+    C_curr = stem_multiplier*C
+    self.stem = nn.Sequential(
+      nn.Conv2d(3*self.dct_channels, C_curr, 3, padding=1, bias=False),
+      nn.BatchNorm2d(C_curr)
+    )
+    
+    C_prev_prev, C_prev, C_curr = C_curr, C_curr, C
+    self.cells = nn.ModuleList()
+    reduction_prev = False
+    for i in range(layers):
+      if i in [layers//3, 2*layers//3]:
+        C_curr *= 2
+        reduction = True
+      else:
+        reduction = False
+      cell = Cell(genotype, C_prev_prev, C_prev, C_curr, reduction, reduction_prev)
+      reduction_prev = reduction
+      self.cells += [cell]
+      C_prev_prev, C_prev = C_prev, cell.multiplier*C_curr
+      if i == 2*layers//3:
+        C_to_auxiliary = C_prev
+
+    if auxiliary:
+      self.auxiliary_head = AuxiliaryHeadImageNet(C_to_auxiliary, num_classes)
+    
+    self.global_pooling = nn.AdaptiveAvgPool2d(1)
+    self.classifier = nn.Linear(C_prev, num_classes)
+
+  def forward(self, input):
+    logits_aux = None
+    s0 = s1 = self.stem(input)
+    for i, cell in enumerate(self.cells):
+      s0, s1 = s1, cell(s0, s1, self.drop_path_prob)
+      if i == 2*self._layers//3:
+        if self._auxiliary and self.training:
+          logits_aux = self.auxiliary_head(s1)
+    out = self.global_pooling(s1)
+    logits = self.classifier(out.view(out.size(0),-1))
+    return logits, logits_aux
 
 class NetworkCIFAR(nn.Module):
 
@@ -211,4 +262,34 @@ class NetworkImageNet(nn.Module):
     out = self.global_pooling(s1)
     logits = self.classifier(out.view(out.size(0), -1))
     return logits, logits_aux
+  
+
+def get_mv_model(new_in_channels: int, new_out_features: int):
+  model = resnet18(weights=None)
+
+  layer = model.conv1
+          
+  new_layer = nn.Conv2d(in_channels=new_in_channels, 
+                    out_channels=layer.out_channels, 
+                    kernel_size=layer.kernel_size, 
+                    stride=layer.stride, 
+                    padding=layer.padding,
+                    bias=layer.bias)
+  
+  model.fc = nn.Sequential(
+    nn.Linear(512, 384),
+    nn.ReLU(),
+    nn.Linear(384, 256),
+    nn.ReLU(),
+    nn.Linear(256, new_out_features)
+  )
+  
+  model.conv1 = new_layer
+
+
+
+  return model
+    
+
+
 

@@ -5,6 +5,11 @@ import shutil
 import torchvision.transforms as transforms
 from torch.autograd import Variable
 
+import transforms as dct_transforms
+
+#batch norm
+DCT_UCF_I_MEAN = [0.5424, 0.5420, 0.5412]
+DCT_UCF_I_STD = [0.0842, 0.0833, 0.0835]
 
 class AvgrageMeter(object):
 
@@ -77,6 +82,73 @@ def _data_transforms_cifar10(args):
     transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
     ])
   return train_transform, valid_transform
+
+def _data_transforms_ucf101(args):
+  train_transform = transforms.Compose([
+    dct_transforms.CenterCrop(28),
+    dct_transforms.ToTensor(),
+    dct_transforms.Concat(),
+    dct_transforms.Normalize(DCT_UCF_I_MEAN, DCT_UCF_I_STD)
+  ])
+
+  valid_transform = transforms.Compose([
+    dct_transforms.CenterCrop(28),
+    dct_transforms.ToTensor(),
+    dct_transforms.Concat(),
+    dct_transforms.Normalize(DCT_UCF_I_MEAN, DCT_UCF_I_STD)
+  ])
+  return train_transform, valid_transform
+
+def _data_transforms_ucf101_train(args):
+  train_transform = transforms.Compose([
+    dct_transforms.RandomCrop(28, pad_if_needed=True),
+    dct_transforms.RandomHorizontalFlip(),
+    dct_transforms.ToTensor(),
+    dct_transforms.Concat()
+  ])
+
+  valid_transform = transforms.Compose([
+    dct_transforms.CenterCrop(28),
+    dct_transforms.ToTensor(),
+    dct_transforms.Concat()
+  ])
+  return train_transform, valid_transform
+
+def _data_transforms_ucf101_train_2(args):
+  train_transform = transforms.Compose([
+    dct_transforms.ToTensor(),
+    dct_transforms.MakeGrid(),
+    transforms.RandomCrop(100, pad_if_needed=True),
+    transforms.Resize(28),
+    transforms.RandomHorizontalFlip(),
+  ])
+
+  if args.cutout:
+    train_transform.transforms.append(Cutout(args.cutout_length))
+  
+  valid_transform = transforms.Compose([
+    dct_transforms.ToTensor(),
+    dct_transforms.MakeGrid(),
+    transforms.Resize((28,28)),
+  ])
+  return train_transform, valid_transform
+
+def _data_transforms_mv(args):
+  train_transform = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor()
+  ])
+
+  valid_transform = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.ToTensor()
+  ])
+
+  return train_transform, valid_transform
+
+
+
 
 
 def count_parameters_in_MB(model):

@@ -1,8 +1,8 @@
 ### custom ignores
-search-EXP-*/
-eval-EXP-*/
+saved_models
 *.0
 .vscode
+PC-DARTS.code-workspace
 
 ### git default python ignore list
 # Byte-compiled / optimized / DLL files

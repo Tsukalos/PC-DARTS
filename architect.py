@@ -37,8 +37,12 @@ class Architect(object):
     self.optimizer.step()
 
   def _backward_step(self, input_valid, target_valid):
-    loss = self.model._loss(input_valid, target_valid)
-    loss.backward()
+    loss_acu = torch.FloatTensor(np.zeros(1)).cuda()
+    for i in input_valid:
+      loss = self.model._loss(i, target_valid)
+      loss_acu+=loss
+      loss_acu=loss_acu/len(input_valid)
+    loss_acu.backward()
 
   def _backward_step_unrolled(self, input_train, target_train, input_valid, target_valid, eta, network_optimizer):
     unrolled_model = self._compute_unrolled_model(input_train, target_train, eta, network_optimizer)
